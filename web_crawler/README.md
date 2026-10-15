@@ -1,6 +1,6 @@
 # Web Crawler Agent & Visual Intelligence Dashboard
 
-An autonomous AI web crawler, research agent, and visual intelligence dashboard built with the **Google Antigravity Python SDK** and **Gemini 2.5 / 3.8**.
+An autonomous AI web crawler, research agent, and visual intelligence dashboard
 
 ![Antigravity Web Crawler](https://img.shields.io/badge/Google_Antigravity-SDK_v0.1.19-blue?style=for-the-badge)
 ![Gemini AI](https://img.shields.io/badge/Model-Gemini_2.5_Flash-cyan?style=for-the-badge)
@@ -19,10 +19,10 @@ An autonomous AI web crawler, research agent, and visual intelligence dashboard 
 - **Verified Sources Gallery**: Visual cards displaying each examined external domain, favicon/globe badge, and direct URL link.
 - **One-Click Export**: Copy Markdown, download `.md` file, or generate print/PDF reports.
 - **Search History & Knowledge Base**: Persistent JSON session archive in `history/`; click any previous crawl to instantly reload results without burning API tokens.
-- **API Key & Model Manager**: Live test connection button, instant validation against Google AI Studio, and model selector (`gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3.8-flash`).
+- **API Key & Model Manager**:
 
 ### 🤖 Autonomous Web Research Agent
-- **Built-in Google Antigravity Tools**:
+- **Built-in**:
   - `SEARCH_WEB`: Formulates Google search queries to discover relevant web pages.
   - `READ_URL_CONTENT`: Scrapes web pages directly, parsing HTML to clean markdown without ad clutter.
   - `VIEW_FILE`: Reads local workspace cache and disk artifacts.
@@ -52,10 +52,10 @@ Or install dependencies:
 pip install -r requirements.txt
 ```
 
-### 2. Configure Gemini API Key
+### 2. Configure AI API Key
 
 Hosted Gemini models require an API key:
-1. Obtain a free API key at [Google AI Studio](https://aistudio.google.com/app/api-keys).
+1. Obtain a  API key.
 2. Configure `.env`:
    ```env
    GEMINI_API_KEY=your_actual_api_key_here
@@ -131,7 +131,3 @@ web_crawler/
 | `POST` | `/api/test-key` | Live connectivity test against Gemini endpoint |
 
 ---
-
-## 🛡️ License
-
-MIT License. Built with Google Antigravity SDK.
