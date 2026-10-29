@@ -107,6 +107,7 @@ const elements = {
   // Action Buttons
   copyMarkdownBtn: document.getElementById('copyMarkdownBtn'),
   downloadMarkdownBtn: document.getElementById('downloadMarkdownBtn'),
+  downloadJsonBtn: document.getElementById('downloadJsonBtn'),
   printReportBtn: document.getElementById('printReportBtn'),
 
   // History Drawer
@@ -271,6 +272,9 @@ function setupEventListeners() {
 
   // Download Markdown
   elements.downloadMarkdownBtn.addEventListener('click', downloadMarkdownFile);
+
+  // Download JSON
+  elements.downloadJsonBtn.addEventListener('click', downloadJsonFile);
 
   // Print Report
   elements.printReportBtn.addEventListener('click', () => window.print());
@@ -808,27 +812,104 @@ async function copyMarkdownToClipboard() {
 }
 
 function downloadMarkdownFile() {
-  const text = state.activeResult?.summary || state.currentStreamText || '';
-  if (!text) {
+  const result = getExportResult();
+  if (!result) {
     showToast('No content to download', 'info');
     return;
   }
 
-  const querySlug = (state.activeResult?.query || 'crawl_report')
+  downloadFile(
+    createMarkdownReport(result),
+    'text/markdown;charset=utf-8',
+    `${createExportSlug(result.query)}_research.md`
+  );
+  showToast('Markdown report downloaded', 'success');
+}
+
+function downloadJsonFile() {
+  const result = getExportResult();
+  if (!result) {
+    showToast('No research result to download yet', 'info');
+    return;
+  }
+
+  downloadFile(
+    `${JSON.stringify(result, null, 2)}\n`,
+    'application/json;charset=utf-8',
+    `${createExportSlug(result.query)}_research.json`
+  );
+  showToast('JSON result downloaded', 'success');
+}
+
+function getExportResult() {
+  if (state.activeResult) return state.activeResult;
+  if (!state.currentStreamText.trim()) return null;
+
+  return {
+    id: state.currentTaskId,
+    query: elements.resultQueryTitle.textContent || 'Research Report',
+    mode: elements.resultModeBadge.textContent || state.activeMode,
+    model: elements.resultModelBadge.textContent || state.systemConfig.currentModel,
+    timestamp: new Date().toISOString(),
+    summary: state.currentStreamText,
+    sources: [],
+    tools_used: [],
+    metrics: {},
+    status: 'in_progress',
+  };
+}
+
+function createMarkdownReport(result) {
+  const lines = [
+    `# ${result.query || 'Research Report'}`,
+    '',
+    `- **Generated:** ${result.timestamp || new Date().toISOString()}`,
+    `- **Model:** ${result.model || 'Unknown'}`,
+    `- **Strategy:** ${result.mode || 'Unknown'}`,
+  ];
+
+  if (result.status === 'in_progress') {
+    lines.push('- **Status:** In progress (partial export)');
+  }
+
+  lines.push('', result.summary || '', '', '## Sources', '');
+
+  const sources = Array.isArray(result.sources) ? result.sources : [];
+  if (sources.length === 0) {
+    lines.push('No sources are available for this result.');
+  } else {
+    for (const source of sources) {
+      const title = source.title || source.domain || source.url;
+      const status = getCitationStatus(source).label;
+      lines.push(`- [${title}](${String(source.url || '').replace(/\)/g, '%29')}) — ${status}`);
+    }
+  }
+
+  lines.push('', '> Source retrieval status does not independently confirm claim accuracy.');
+  return `${lines.join('\n')}\n`;
+}
+
+function createExportSlug(query) {
+  const slug = String(query || 'crawl_report')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
-    .substring(0, 40);
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  return slug || 'crawl_report';
+}
 
-  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
+function downloadFile(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${querySlug}_research.md`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('Report downloaded as Markdown', 'success');
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ==========================================================================

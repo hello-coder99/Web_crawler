@@ -1396,6 +1396,12 @@ html, body {
   color: var(--accent-amber);
 }
 
+.citation-status--read,
+.citation-status--failed,
+.citation-status--unread {
+  background: #fff;
+}
+
 .sources-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -1459,6 +1465,161 @@ html, body {
   font-size: 0.75rem;
   color: var(--text-muted);
   word-break: break-all;
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 18mm;
+  }
+
+  html,
+  body {
+    min-height: 0;
+    overflow: visible;
+    background: #fff !important;
+    color: #111827 !important;
+    font: 10pt/1.5 Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .app-header,
+  .app-footer,
+  .ambient-glow,
+  .crawl-command-panel,
+  #welcomeSection,
+  #telemetrySection,
+  .results-toolbar {
+    display: none !important;
+  }
+
+  .app-wrapper,
+  .dashboard-main {
+    display: block;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  #resultsSection {
+    display: block !important;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: #fff !important;
+    box-shadow: none;
+  }
+
+  #tabDossier,
+  #tabSources {
+    display: block !important;
+    padding: 0;
+    overflow: visible;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  #tabTelemetry,
+  #tabRaw {
+    display: none !important;
+  }
+
+  .result-meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 0 0 12px;
+    border-bottom: 1px solid #d1d5db;
+    background: #fff !important;
+  }
+
+  .meta-label,
+  .meta-val,
+  .result-meta-bar strong,
+  .tech-pill {
+    color: #374151 !important;
+  }
+
+  .tech-pill {
+    border-color: #9ca3af !important;
+    background: #fff !important;
+  }
+
+  .markdown-body,
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body strong,
+  .markdown-body code,
+  .markdown-body a {
+    color: #111827 !important;
+  }
+
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3 {
+    break-after: avoid-page;
+  }
+
+  .markdown-body a {
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+  }
+
+  .markdown-body pre,
+  .markdown-body blockquote,
+  .markdown-body table,
+  .source-card {
+    break-inside: avoid-page;
+  }
+
+  .markdown-body pre,
+  .markdown-body pre code,
+  .markdown-body th,
+  .markdown-body td,
+  .markdown-body tr:nth-child(even),
+  .markdown-body blockquote,
+  .source-card {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .markdown-body pre,
+  .markdown-body th,
+  .markdown-body td,
+  .source-card {
+    border-color: #d1d5db !important;
+  }
+
+  .citation-summary {
+    border-color: #d1d5db;
+    background: #fff !important;
+    color: #374151;
+  }
+
+  #tabSources {
+    break-before: page;
+    margin-top: 20px;
+  }
+
+  .sources-panel-header h3,
+  .sources-panel-header p,
+  .source-card-title,
+  .source-card-url {
+    color: #111827 !important;
+  }
+
+  .source-domain-pill {
+    background: #fff;
+    color: #111827;
+  }
+
+  .citation-status {
+    background: #fff !important;
+  }
 }
 
 /* Audit Telemetry Table */
