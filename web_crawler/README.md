@@ -2,8 +2,6 @@
 
 An autonomous AI web crawler, research agent, and visual intelligence dashboard
 
-![Antigravity Web Crawler](https://img.shields.io/badge/Google_Antigravity-SDK_v0.1.19-blue?style=for-the-badge)
-![Gemini AI](https://img.shields.io/badge/Model-Gemini_2.5_Flash-cyan?style=for-the-badge)
 ![FastAPI & Starlette](https://img.shields.io/badge/Backend-Starlette_ASGI-emerald?style=for-the-badge)
 
 ---
@@ -17,6 +15,7 @@ An autonomous AI web crawler, research agent, and visual intelligence dashboard
 - **Live Token & Reasoning Stream**: Stream response tokens and reasoning in real-time as the agent generates them.
 - **Rich Markdown Findings Dossier**: Syntax-highlighted code blocks with 1-click copy, structured tables, callouts, and clean formatting.
 - **Verified Sources Gallery**: Visual cards displaying each examined external domain, favicon/globe badge, and direct URL link.
+- **Citation checks**: Inline citations are matched to pages the crawler successfully read; failed or unvisited URLs are labeled. Retrieval status does not establish claim accuracy.
 - **One-Click Export**: Copy Markdown, download `.md` file, or generate print/PDF reports.
 - **Search History & Knowledge Base**: Persistent JSON session archive in `history/`; click any previous crawl to instantly reload results without burning API tokens.
 - **API Key & Model Manager**:

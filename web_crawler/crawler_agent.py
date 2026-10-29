@@ -16,63 +16,78 @@ load_dotenv()
 HISTORY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history")
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
-def extract_sources(text: str, tool_events: list = None) -> list:
-    """Extract distinct source URLs and domain metadata from text and tool events."""
-    sources = []
-    seen_urls = set()
+def _normalize_source_url(url: str) -> str | None:
+    """Normalize an HTTP(S) URL for matching citations to fetched pages."""
+    try:
+        parsed = urlparse(url.strip())
+    except (AttributeError, ValueError):
+        return None
 
-    # 1. From tool events (e.g. read_url_content)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        return None
+
+    path = parsed.path.rstrip("/") or "/"
+    return parsed._replace(
+        scheme=parsed.scheme.lower(),
+        netloc=parsed.netloc.lower(),
+        path=path,
+        fragment="",
+    ).geturl()
+
+
+def extract_sources(text: str, tool_events: list = None) -> list:
+    """Extract cited URLs and report whether the crawler successfully read them."""
+    sources_by_url = {}
+
+    def add_source(url: str, title: str, source_type: str) -> None:
+        normalized_url = _normalize_source_url(url)
+        if not normalized_url:
+            return
+
+        source = sources_by_url.get(normalized_url)
+        if source is None:
+            domain = urlparse(normalized_url).netloc.removeprefix("www.")
+            source = {
+                "url": url.strip(),
+                "domain": domain,
+                "title": title or domain,
+                "type": source_type,
+                "cited": source_type == "referenced",
+            }
+            sources_by_url[normalized_url] = source
+        elif title and source.get("title") == source.get("domain"):
+            source["title"] = title
+
+        if source_type == "referenced":
+            source["cited"] = True
+
+        # A successful read is stronger evidence than a failed read or a citation alone.
+        if source_type == "scraped" or (
+            source_type == "failed" and source.get("type") == "referenced"
+        ):
+            source["type"] = source_type
+
     if tool_events:
         for ev in tool_events:
             args = ev.get("args") or {}
             url = args.get("url") or args.get("Url")
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                try:
-                    domain = urlparse(url).netloc.replace("www.", "")
-                except Exception:
-                    domain = "web"
-                sources.append({
-                    "url": url,
-                    "domain": domain,
-                    "title": ev.get("title") or domain,
-                    "type": "scraped"
-                })
+            if not url or str(ev.get("name", "")).lower() != "read_url_content":
+                continue
+            status = "scraped" if ev.get("status") == "completed" else "failed"
+            add_source(str(url), "", status)
 
-    # 2. Markdown links: [Title](https://...)
+    # Markdown links make it possible to connect a finding directly to its source.
     md_links = re.findall(r'\[([^\]]+)\]\((https?://[^\s\)]+)\)', text)
     for title, url in md_links:
-        if url not in seen_urls:
-            seen_urls.add(url)
-            try:
-                domain = urlparse(url).netloc.replace("www.", "")
-            except Exception:
-                domain = "web"
-            sources.append({
-                "url": url,
-                "domain": domain,
-                "title": title.strip(),
-                "type": "referenced"
-            })
+        add_source(url, title.strip(), "referenced")
 
-    # 3. Plain URLs: https://...
+    # Also retain plain URLs from reports that do not use Markdown links.
     plain_urls = re.findall(r'(?<!\()(https?://[a-zA-Z0-9_\-\./\?%&=+#~:;]+)', text)
     for url in plain_urls:
         url = url.rstrip('.,;)\'"')
-        if url not in seen_urls:
-            seen_urls.add(url)
-            try:
-                domain = urlparse(url).netloc.replace("www.", "")
-            except Exception:
-                domain = "web"
-            sources.append({
-                "url": url,
-                "domain": domain,
-                "title": domain,
-                "type": "referenced"
-            })
+        add_source(url, "", "referenced")
 
-    return sources
+    return list(sources_by_url.values())
 
 def save_crawl_result(result: dict) -> str:
     """Save a completed crawl result to the history folder."""
@@ -255,22 +270,25 @@ async def crawl_topic(
     mode_instructions = {
         "fast": (
             "Provide a rapid, clear synthesis of the topic. Search for the most direct answers, "
-            "provide 3-5 high-impact bullet points, key takeaways, and source citations."
+            "provide 3-5 high-impact bullet points, key takeaways, and source citations. "
+            "Cite factual claims inline with Markdown links to the specific supporting URLs."
         ),
         "deep": (
             "Perform comprehensive, deep research. Search the web with multiple queries if necessary, "
             "read and inspect the most authoritative pages, cross-examine evidence, and produce a detailed, "
             "structured research dossier with: Executive Summary, Key Findings, Technical Details, "
-            "Emerging Trends, and Verified Sources."
+            "Emerging Trends, and Verified Sources. Cite factual claims inline with Markdown links to "
+            "the specific supporting URLs; do not rely only on a references list."
         ),
         "technical": (
             "Conduct an in-depth technical investigation. Focus specifically on code patterns, API specifications, "
             "architectural diagrams/tables, configuration recipes, performance characteristics, and implementation guides. "
-            "Include code blocks where applicable and cite official technical documentation."
+            "Include code blocks where applicable and cite official technical documentation inline with Markdown links."
         ),
         "market": (
             "Perform an industry intelligence analysis. Focus on market statistics, leading organizations/projects, "
-            "timeline milestones, comparative analysis, future projections, and cited references."
+            "timeline milestones, comparative analysis, future projections, and cited references. "
+            "Cite factual claims inline with Markdown links to the specific supporting URLs."
         ),
     }
     mode_guide = mode_instructions.get(mode, mode_instructions["deep"])
@@ -283,13 +301,15 @@ async def crawl_topic(
         f"1. Executive Summary\n"
         f"2. Core Insights & Detailed Findings (use markdown tables, bullet points, and code snippets when helpful)\n"
         f"3. Practical Applications or Architectural Notes\n"
-        f"4. Verified Source References (list each URL examined)\n"
+        f"4. Verified Source References (list each URL examined)\n\n"
+        f"Attach inline Markdown links to the relevant factual claims, using the exact page URLs you read. "
+        f"Do not present a URL as a verified source unless its page was successfully read. "
+        f"If evidence is unavailable, state that rather than inventing a citation.\n"
     )
 
     config = LocalAgentConfig(
         api_key=api_key,
         model=model_name,
-        retry_config=types.RetryConfig.benchmark(),
         capabilities=CapabilitiesConfig(
             enabled_tools=selected_tools,
             agent_behavior=types.AgentBehavior.AUTONOMOUS,

@@ -17,6 +17,7 @@ An autonomous AI web crawler, research agent, and visual intelligence dashboard
 - **Live Token & Reasoning Stream**: Stream response tokens and reasoning in real-time as the agent generates them.
 - **Rich Markdown Findings Dossier**: Syntax-highlighted code blocks with 1-click copy, structured tables, callouts, and clean formatting.
 - **Verified Sources Gallery**: Visual cards displaying each examined external domain, favicon/globe badge, and direct URL link.
+- **Citation checks**: Inline citations are matched to pages the crawler successfully read; failed or unvisited URLs are labeled. Retrieval status does not establish claim accuracy.
 - **One-Click Export**: Copy Markdown, download `.md` file, or generate print/PDF reports.
 - **Search History & Knowledge Base**: Persistent JSON session archive in `history/`; click any previous crawl to instantly reload results without burning API tokens.
 - **API Key & Model Manager**:

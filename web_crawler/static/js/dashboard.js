@@ -92,6 +92,7 @@ const elements = {
   resultModeBadge: document.getElementById('resultModeBadge'),
   resultTimestamp: document.getElementById('resultTimestamp'),
   markdownRenderArea: document.getElementById('markdownRenderArea'),
+  citationSummary: document.getElementById('citationSummary'),
   sourcesGrid: document.getElementById('sourcesGrid'),
   sourceCountBadge: document.getElementById('sourceCountBadge'),
   rawMarkdownTextarea: document.getElementById('rawMarkdownTextarea'),
@@ -339,6 +340,7 @@ async function initiateCrawl() {
   elements.resultTimestamp.textContent = 'Streaming live...';
   state.currentStreamText = '';
   state.activeResult = null;
+  elements.citationSummary.hidden = true;
 
   try {
     const response = await fetch('/api/crawl', {
@@ -453,17 +455,33 @@ function startEventStream(taskId) {
   });
 
   es.addEventListener('error', (e) => {
-    let msg = 'Connection stream error';
-    try {
-      if (e.data) {
+    if (typeof e.data === 'string') {
+      let message = 'The crawler failed to complete this request.';
+      try {
         const data = JSON.parse(e.data);
-        msg = data.message || msg;
+        message = data.message || message;
+      } catch (err) {
+        console.warn('Could not parse crawl error event:', err);
       }
-    } catch (err) {}
 
-    console.warn('SSE event error:', msg);
-    // Don't immediately fail on transient SSE reconnects unless finished
-    if (state.activeResult) {
+      stopTimer();
+      setButtonLoading(false);
+      updateAgentStatus('error', 'Crawl Failed');
+      elements.telemetryStatusTitle.textContent = 'Crawl Failed';
+      elements.telemetryStatusSub.textContent = message;
+      setPipelineStep(4, 'failed');
+
+      const errorMessage = document.createElement('div');
+      errorMessage.className = 'crawl-error';
+      errorMessage.textContent = message;
+      elements.markdownRenderArea.replaceChildren(errorMessage);
+      es.close();
+      if (state.eventSource === es) state.eventSource = null;
+      showToast('Crawl failed. See the error in the results panel.', 'error');
+    } else if (!state.activeResult) {
+      elements.telemetryStatusSub.textContent = 'Connection interrupted; attempting to reconnect...';
+      console.warn('Crawl event stream disconnected; EventSource will retry.');
+    } else {
       es.close();
     }
   });
@@ -489,7 +507,10 @@ function finalizeCrawl(result) {
   elements.resultTimestamp.textContent = new Date(result.timestamp).toLocaleTimeString();
 
   // Populate sources gallery
-  renderSourcesGrid(result.sources || []);
+  const sources = result.sources || [];
+  renderCitationChecks(sources);
+  renderCitationSummary(sources);
+  renderSourcesGrid(sources);
 
   // Populate telemetry audit
   renderAuditTelemetry(result);
@@ -530,6 +551,8 @@ function setPipelineStep(stepNum, status) {
     step.classList.add('completed');
     const connector = elements.connectors[stepNum];
     if (connector) connector.classList.add('completed');
+  } else if (status === 'failed') {
+    step.classList.add('failed');
   }
 }
 
@@ -595,8 +618,9 @@ function renderSourcesGrid(sources) {
   elements.sourcesGrid.innerHTML = sources.map(src => {
     const domain = src.domain || 'web source';
     const title = src.title || domain;
+    const status = getCitationStatus(src);
     return `
-      <a href="${src.url}" target="_blank" rel="noopener noreferrer" class="source-card">
+      <a href="${escapeHtml(src.url)}" target="_blank" rel="noopener noreferrer" class="source-card">
         <div class="source-card-top">
           <span class="source-domain-pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -606,6 +630,7 @@ function renderSourcesGrid(sources) {
             </svg>
             ${escapeHtml(domain)}
           </span>
+          <span class="citation-status ${status.className}">${status.label}</span>
           <span class="source-external-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -619,6 +644,91 @@ function renderSourcesGrid(sources) {
       </a>
     `;
   }).join('');
+}
+
+function normalizeCitationUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    url.hash = '';
+    if (url.pathname !== '/') url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.href;
+  } catch (err) {
+    return null;
+  }
+}
+
+function getCitationStatus(source) {
+  switch (source.type) {
+    case 'scraped':
+      return {
+        label: 'Read by agent',
+        className: 'citation-status--read',
+        description: 'The crawler successfully read this page.',
+      };
+    case 'failed':
+      return {
+        label: 'Read failed',
+        className: 'citation-status--failed',
+        description: 'The crawler attempted to read this page but failed.',
+      };
+    case 'referenced':
+      return {
+        label: 'Not fetched',
+        className: 'citation-status--unread',
+        description: 'This URL appears in the report but was not successfully read.',
+      };
+    default:
+      return {
+        label: 'Not checked',
+        className: 'citation-status--unread',
+        description: 'The page retrieval status is unavailable.',
+      };
+  }
+}
+
+function renderCitationChecks(sources) {
+  const sourcesByUrl = new Map(
+    sources.map(source => [normalizeCitationUrl(source.url), source])
+      .filter(([url]) => url)
+  );
+
+  elements.markdownRenderArea.querySelectorAll('a[href]').forEach(link => {
+    const normalizedUrl = normalizeCitationUrl(link.href);
+    if (!normalizedUrl) return;
+
+    const source = sourcesByUrl.get(normalizedUrl);
+    const status = source
+      ? getCitationStatus(source)
+      : getCitationStatus({ type: 'unknown' });
+    const badge = document.createElement('span');
+    badge.className = `citation-check ${status.className}`;
+    badge.textContent = status.label;
+    badge.title = status.description;
+    link.insertAdjacentElement('afterend', badge);
+  });
+}
+
+function renderCitationSummary(sources) {
+  const citedSources = sources.filter(source =>
+    source.cited === true || (!('cited' in source) && source.type !== 'scraped')
+  );
+  const readCount = citedSources.filter(source => source.type === 'scraped').length;
+  const failedCount = citedSources.filter(source => source.type === 'failed').length;
+  const notFetchedCount = citedSources.filter(source => source.type === 'referenced').length;
+  const readButNotCitedCount = sources.filter(source =>
+    source.type === 'scraped' && source.cited === false
+  ).length;
+
+  elements.citationSummary.hidden = sources.length === 0;
+  if (sources.length === 0) return;
+
+  const details = [`${readCount} cited pages read by the crawler`];
+  if (failedCount) details.push(`${failedCount} cited pages failed to read`);
+  if (notFetchedCount) details.push(`${notFetchedCount} cited URLs not fetched`);
+  if (readButNotCitedCount) details.push(`${readButNotCitedCount} other pages read`);
+  elements.citationSummary.textContent =
+    `Citation check: ${details.join(' · ')}. Retrieval status does not confirm claim accuracy.`;
 }
 
 function renderAuditTelemetry(result) {
